@@ -37,4 +37,8 @@ class AppConstants {
   // ── Cloud Functions base URL (update after Firebase deploy) ──
   static const String cloudFunctionsBaseUrl =
       'https://us-central1-propflow-aeem-26.cloudfunctions.net';
+
+  // ── Google Sign-In Web Client ID (from google-services.json client_type: 3) ──
+  static const String googleWebClientId =
+      '51630635889-m7ljb060k8itq48tk2ntvr5s1rasjat7.apps.googleusercontent.com';
 }
