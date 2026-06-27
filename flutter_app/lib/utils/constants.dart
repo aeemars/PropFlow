@@ -7,19 +7,29 @@ class AppConstants {
   static const String arcExplorerBase = 'https://testnet.arcscan.app';
 
   // ── USDC on Arc (ERC-20 interface, 6 decimals) ──
-  static const String usdcAddress =
-      '0x3600000000000000000000000000000000000000';
+  static const String usdcAddress = String.fromEnvironment(
+    'USDC_ADDRESS',
+    defaultValue: '0x3600000000000000000000000000000000000000',
+  );
   static const int usdcDecimals = 6;
 
   // ── Deployed Contract Addresses (UPDATE AFTER REMIX DEPLOYMENT) ──
-  static const String kycRegistryAddress =
-      '0x0000000000000000000000000000000000000000';
-  static const String propTokenAddress =
-      '0x0000000000000000000000000000000000000000';
-  static const String rentDistributorAddress =
-      '0x0000000000000000000000000000000000000000';
-  static const String propertyRegistryAddress =
-      '0x0000000000000000000000000000000000000000';
+  static const String kycRegistryAddress = String.fromEnvironment(
+    'KYC_REGISTRY_ADDRESS',
+    defaultValue: '0x0000000000000000000000000000000000000000',
+  );
+  static const String propTokenAddress = String.fromEnvironment(
+    'PROP_TOKEN_ADDRESS',
+    defaultValue: '0x0000000000000000000000000000000000000000',
+  );
+  static const String rentDistributorAddress = String.fromEnvironment(
+    'RENT_DISTRIBUTOR_ADDRESS',
+    defaultValue: '0x0000000000000000000000000000000000000000',
+  );
+  static const String propertyRegistryAddress = String.fromEnvironment(
+    'PROPERTY_REGISTRY_ADDRESS',
+    defaultValue: '0x0000000000000000000000000000000000000000',
+  );
 
   // ── Circle API (placeholder — configure after console.circle.com signup) ──
   static const String circleApiBaseUrl = 'https://api.circle.com';
