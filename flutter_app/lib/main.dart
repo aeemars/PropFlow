@@ -13,7 +13,7 @@ import 'screens/property_listing_screen.dart';
 import 'screens/kyc_screen.dart';
 import 'screens/buy_shares_screen.dart';
 import 'screens/portfolio_screen.dart';
-import 'screens/admin_screen.dart';
+import 'screens/profile_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,7 +44,7 @@ class PropFlowApp extends StatelessWidget {
           '/properties': (context) => const PropertyListingScreen(),
           '/buy': (context) => const BuySharesScreen(),
           '/portfolio': (context) => const PortfolioScreen(),
-          '/admin': (context) => const AdminScreen(),
+          '/profile': (context) => const ProfileScreen(),
         },
       ),
     );
@@ -92,7 +92,7 @@ class _MainNavigationState extends State<MainNavigation> {
   final List<Widget> _screens = const [
     PropertyListingScreen(),
     PortfolioScreen(),
-    AdminScreen(),
+    ProfileScreen(),
   ];
 
   @override
@@ -123,9 +123,9 @@ class _MainNavigationState extends State<MainNavigation> {
               label: 'Portfolio',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.admin_panel_settings_outlined),
-              activeIcon: Icon(Icons.admin_panel_settings),
-              label: 'Admin',
+              icon: Icon(Icons.person_outline_rounded),
+              activeIcon: Icon(Icons.person_rounded),
+              label: 'Profile',
             ),
           ],
         ),

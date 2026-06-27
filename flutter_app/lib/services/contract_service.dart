@@ -172,35 +172,35 @@ class ContractService {
   //  RentDistributor — Read Operations
   // ══════════════════════════════════════════════
 
-  /// Get pending rent in the distribution pool.
-  Future<BigInt> getPendingRent() async {
+  /// Get total rent ever claimed.
+  Future<BigInt> getTotalClaimed() async {
     await initialize();
     final result = await _client.call(
       contract: _rentDistributor!,
-      function: _rentDistributor!.function('pendingRent'),
+      function: _rentDistributor!.function('totalClaimed'),
       params: [],
     );
     return result.first as BigInt;
   }
 
-  /// Get total rent ever distributed.
-  Future<BigInt> getTotalDistributed() async {
+  /// Get total claimable rent for a holder in 6-decimal USDC units.
+  Future<BigInt> getClaimableRent(String holderAddress) async {
     await initialize();
     final result = await _client.call(
       contract: _rentDistributor!,
-      function: _rentDistributor!.function('totalDistributed'),
-      params: [],
+      function: _rentDistributor!.function('getClaimableRent'),
+      params: [EthereumAddress.fromHex(holderAddress)],
     );
     return result.first as BigInt;
   }
 
-  /// Get last distribution timestamp.
-  Future<BigInt> getLastDistribution() async {
+  /// Get total expired rent for a holder in 6-decimal USDC units.
+  Future<BigInt> getExpiredRent(String holderAddress) async {
     await initialize();
     final result = await _client.call(
       contract: _rentDistributor!,
-      function: _rentDistributor!.function('lastDistribution'),
-      params: [],
+      function: _rentDistributor!.function('getExpiredRent'),
+      params: [EthereumAddress.fromHex(holderAddress)],
     );
     return result.first as BigInt;
   }
@@ -307,23 +307,7 @@ class ContractService {
     );
   }
 
-  /// Trigger rent distribution (admin only).
-  Future<String> distributeRent({required String privateKey}) async {
-    await initialize();
-    final credentials = EthPrivateKey.fromHex(privateKey);
 
-    final tx = Transaction.callContract(
-      contract: _rentDistributor!,
-      function: _rentDistributor!.function('distributeRent'),
-      parameters: [],
-    );
-
-    return await _client.sendTransaction(
-      credentials,
-      tx,
-      chainId: AppConstants.arcChainId,
-    );
-  }
 
   // ══════════════════════════════════════════════
   //  Helpers

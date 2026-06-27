@@ -10,27 +10,28 @@ import "./PropToken.sol";
 /**
  * @title RentDistributor
  * @author PropFlow
- * @notice Accepts USDC rent deposits and distributes them proportionally to
- *         all PropToken holders.
- * @dev Any address (property manager, Circle Gateway webhook, admin) can
- *      deposit rent via `depositRent()`. The owner (or an automated keeper)
- *      then calls `distributeRent()` to push USDC to each holder in proportion
- *      to their token balance.
- *
- *      Proportional calculation:
- *        holderShare = (holderBalance / totalSupply) * rentPool
- *
- *      For the hackathon MVP, the holders array is maintained in PropToken and
- *      iterated here. This is O(n) and acceptable for demo-scale holder counts.
+ * @notice Accepts USDC rent deposits and allows PropToken holders to pull (claim)
+ *         their proportional share of earned rent.
+ * @dev Instead of pushing rent to all holders in a single transaction (O(n)),
+ *      this contract registers each holder's proportional share locally on deposit.
+ *      Users can claim their accrued rent monthly. Expired rent (older than 12 months)
+ *      can be pushed automatically to the user's address.
  *
  *      Deploy after PropToken:
  *      KYCRegistry → PropToken → RentDistributor → PropertyRegistry
- *
- * @custom:demo-property
- *      Monthly rent: 1,200 USDC → 0.012 USDC per token per month
  */
 contract RentDistributor is Ownable {
     using SafeERC20 for IERC20;
+
+    // ──────────────────────────────────────────────
+    //  Data Structures
+    // ──────────────────────────────────────────────
+
+    struct RentPayment {
+        uint256 amount;
+        uint256 timestamp;
+        bool claimed;
+    }
 
     // ──────────────────────────────────────────────
     //  State
@@ -42,33 +43,27 @@ contract RentDistributor is Ownable {
     /// @notice The USDC ERC-20 contract (6 decimals on Arc).
     IERC20 public usdcToken;
 
-    /// @notice Undistributed USDC available for next distribution.
-    uint256 public rentPool;
+    /// @notice Track rent payments for each holder.
+    mapping(address => RentPayment[]) public rentPayments;
 
-    /// @notice Running total of all USDC ever distributed.
-    uint256 public totalDistributed;
+    /// @notice Running total of all USDC ever deposited.
+    uint256 public totalDeposited;
 
-    /// @notice Timestamp of the last successful distribution.
-    uint256 public lastDistribution;
+    /// @notice Running total of all USDC ever claimed.
+    uint256 public totalClaimed;
 
     // ──────────────────────────────────────────────
     //  Events
     // ──────────────────────────────────────────────
 
-    /// @notice Emitted when rent USDC is deposited into the pool.
-    /// @param depositor Address that deposited.
-    /// @param amount    USDC amount deposited (6-decimal units).
+    /// @notice Emitted when rent USDC is deposited into the distributor.
     event RentDeposited(address indexed depositor, uint256 amount);
 
-    /// @notice Emitted after a successful rent distribution round.
-    /// @param totalAmount Total USDC distributed in this round.
-    /// @param timestamp   Block timestamp of the distribution.
-    event RentDistributed(uint256 totalAmount, uint256 timestamp);
+    /// @notice Emitted when a holder claims their rent.
+    event RentClaimed(address indexed holder, uint256 amount);
 
-    /// @notice Emitted for each individual holder payout (useful for indexing).
-    /// @param holder Address that received rent.
-    /// @param amount USDC amount received (6-decimal units).
-    event RentPaid(address indexed holder, uint256 amount);
+    /// @notice Emitted when expired rent is automatically paid out.
+    event AutoRentPaid(address indexed holder, uint256 amount);
 
     // ──────────────────────────────────────────────
     //  Constructor
@@ -95,8 +90,8 @@ contract RentDistributor is Ownable {
     // ──────────────────────────────────────────────
 
     /**
-     * @notice Deposit USDC rent into the distribution pool.
-     * @dev Callable by anyone (property manager, Gateway webhook, admin).
+     * @notice Deposit USDC rent into the distributor.
+     * @dev Calculates and registers the proportional rent share for all current holders.
      *      Caller must approve this contract on USDC first.
      * @param amount USDC amount to deposit (6-decimal units).
      */
@@ -104,66 +99,137 @@ contract RentDistributor is Ownable {
         require(amount > 0, "RentDistributor: zero deposit");
 
         usdcToken.safeTransferFrom(msg.sender, address(this), amount);
-        rentPool += amount;
-
-        emit RentDeposited(msg.sender, amount);
-    }
-
-    // ──────────────────────────────────────────────
-    //  Distribution
-    // ──────────────────────────────────────────────
-
-    /**
-     * @notice Distribute accumulated rent to all PropToken holders.
-     * @dev Iterates the holders array from PropToken and sends each holder
-     *      their proportional share: (balance / totalSupply) * rentPool.
-     *
-     *      Only callable by the contract owner (or future keeper integration).
-     *
-     *      Gas note: O(n) over holders — fine for MVP demo scale.
-     *      Production would use a Merkle-drop or pull-based pattern.
-     */
-    function distributeRent() external onlyOwner {
-        require(rentPool > 0, "RentDistributor: no rent to distribute");
+        totalDeposited += amount;
 
         uint256 supply = propToken.totalSupply();
         require(supply > 0, "RentDistributor: no tokens minted");
 
         address[] memory holders = propToken.getHolders();
-        uint256 distributed = 0;
-        uint256 poolSnapshot = rentPool;
-
         for (uint256 i = 0; i < holders.length; i++) {
-            uint256 balance = propToken.balanceOf(holders[i]);
+            address holder = holders[i];
+            uint256 balance = propToken.balanceOf(holder);
             if (balance == 0) continue;
 
-            // Proportional share: (balance * poolSnapshot) / supply
-            uint256 share = (balance * poolSnapshot) / supply;
+            // Proportional share: (balance * amount) / supply
+            uint256 share = (balance * amount) / supply;
             if (share == 0) continue;
 
-            usdcToken.safeTransfer(holders[i], share);
-            distributed += share;
-
-            emit RentPaid(holders[i], share);
+            rentPayments[holder].push(RentPayment({
+                amount: share,
+                timestamp: block.timestamp,
+                claimed: false
+            }));
         }
 
-        // Update state
-        rentPool -= distributed;
-        totalDistributed += distributed;
-        lastDistribution = block.timestamp;
-
-        emit RentDistributed(distributed, block.timestamp);
+        emit RentDeposited(msg.sender, amount);
     }
 
     // ──────────────────────────────────────────────
-    //  View helpers
+    //  Claim Flow
     // ──────────────────────────────────────────────
 
     /**
-     * @notice Returns the pending rent available for distribution.
-     * @return USDC amount in the pool (6-decimal units).
+     * @notice Claim all accumulated unclaimed rent.
      */
-    function pendingRent() external view returns (uint256) {
-        return rentPool;
+    function claimRent() external {
+        _claimRentFor(msg.sender);
+    }
+
+    /**
+     * @notice Claim all accumulated unclaimed rent for a specific holder.
+     * @param holder Address of the holder.
+     */
+    function claimRentFor(address holder) external {
+        _claimRentFor(holder);
+    }
+
+    /**
+     * @dev Internal helper to execute claims.
+     */
+    function _claimRentFor(address holder) internal {
+        uint256 claimable = 0;
+        uint256 length = rentPayments[holder].length;
+
+        for (uint256 i = 0; i < length; i++) {
+            if (!rentPayments[holder][i].claimed) {
+                claimable += rentPayments[holder][i].amount;
+                rentPayments[holder][i].claimed = true;
+            }
+        }
+
+        require(claimable > 0, "RentDistributor: no rent to claim");
+        totalClaimed += claimable;
+
+        usdcToken.safeTransfer(holder, claimable);
+
+        emit RentClaimed(holder, claimable);
+    }
+
+    /**
+     * @notice Auto-payout expired rent (older than 12 months / 365 days).
+     * @dev Can be triggered by keepers or backend cron jobs.
+     * @param holder Address of the holder to payout.
+     */
+    function payoutExpiredRent(address holder) external {
+        uint256 expiredAmount = 0;
+        uint256 length = rentPayments[holder].length;
+
+        for (uint256 i = 0; i < length; i++) {
+            if (!rentPayments[holder][i].claimed && (block.timestamp - rentPayments[holder][i].timestamp >= 365 days)) {
+                expiredAmount += rentPayments[holder][i].amount;
+                rentPayments[holder][i].claimed = true;
+            }
+        }
+
+        require(expiredAmount > 0, "RentDistributor: no expired rent to distribute");
+        totalClaimed += expiredAmount;
+
+        usdcToken.safeTransfer(holder, expiredAmount);
+
+        emit AutoRentPaid(holder, expiredAmount);
+    }
+
+    // ──────────────────────────────────────────────
+    //  Views
+    // ──────────────────────────────────────────────
+
+    /**
+     * @notice Returns total claimable rent for a holder.
+     * @param holder Address of the holder.
+     */
+    function getClaimableRent(address holder) external view returns (uint256) {
+        uint256 claimable = 0;
+        uint256 length = rentPayments[holder].length;
+
+        for (uint256 i = 0; i < length; i++) {
+            if (!rentPayments[holder][i].claimed) {
+                claimable += rentPayments[holder][i].amount;
+            }
+        }
+        return claimable;
+    }
+
+    /**
+     * @notice Returns total expired rent for a holder.
+     * @param holder Address of the holder.
+     */
+    function getExpiredRent(address holder) external view returns (uint256) {
+        uint256 expiredAmount = 0;
+        uint256 length = rentPayments[holder].length;
+
+        for (uint256 i = 0; i < length; i++) {
+            if (!rentPayments[holder][i].claimed && (block.timestamp - rentPayments[holder][i].timestamp >= 365 days)) {
+                expiredAmount += rentPayments[holder][i].amount;
+            }
+        }
+        return expiredAmount;
+    }
+
+    /**
+     * @notice Returns the number of rent payment records for a holder.
+     * @param holder Address of the holder.
+     */
+    function getRentPaymentsCount(address holder) external view returns (uint256) {
+        return rentPayments[holder].length;
     }
 }

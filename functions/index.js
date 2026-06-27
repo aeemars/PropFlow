@@ -180,7 +180,12 @@ const PROPTOKEN_ABI = [
   'function pricePerToken() view returns (uint256)',
 ];
 const USDC_ABI = ['function approve(address spender, uint256 amount) external returns (bool)'];
-const DISTRIBUTOR_ABI = ['function distributeRent() external'];
+const DISTRIBUTOR_ABI = [
+  'function claimRentFor(address holder) external',
+  'function payoutExpiredRent(address holder) external',
+  'function getClaimableRent(address holder) view returns (uint256)',
+  'function getExpiredRent(address holder) view returns (uint256)',
+];
 
 /**
  * purchaseShares — buy PropTokens on behalf of an investor.
@@ -301,19 +306,81 @@ exports.distributeRentOnChain = functions.https.onRequest(async (req, res) => {
 
   try {
     const signer = getPlatformSigner();
+    
+    // Minimal ABI for PropToken to get holders
+    const PROPTOKEN_ABI_EXP = ['function getHolders() external view returns (address[] memory)'];
+    const propToken = new ethers.Contract(
+      process.env.PROP_TOKEN_ADDRESS,
+      PROPTOKEN_ABI_EXP,
+      signer
+    );
+
     const distributor = new ethers.Contract(
       process.env.RENT_DISTRIBUTOR_ADDRESS,
       DISTRIBUTOR_ABI,
       signer
     );
 
-    const tx      = await distributor.distributeRent();
+    const holders = await propToken.getHolders();
+    const txHashes = [];
+
+    for (let i = 0; i < holders.length; i++) {
+      const holder = holders[i];
+      // Check if holder has expired rent on-chain
+      const expiredAmount = await distributor.getExpiredRent(holder);
+      if (expiredAmount > 0) {
+        console.log(`Auto-paying expired rent for ${holder}: ${expiredAmount} units...`);
+        const tx = await distributor.payoutExpiredRent(holder);
+        const receipt = await tx.wait();
+        txHashes.push(receipt.hash);
+        console.log(`Auto-paid expired rent for ${holder}. TX:`, receipt.hash);
+      }
+    }
+
+    return res.status(200).json({ txHashes });
+  } catch (error) {
+    console.error('distributeRentOnChain error:', error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * claimRent — call RentDistributor.claimRentFor(walletAddress).
+ *
+ * Body: { userId: string }
+ * Returns: { txHash }
+ */
+exports.claimRent = functions.https.onRequest(async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'POST');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(204).send('');
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  try {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId is required' });
+
+    // Get user wallet address from Firestore
+    const userDoc = await admin.firestore().collection('users').doc(userId).get();
+    if (!userDoc.exists) return res.status(404).json({ error: 'User not found' });
+    const walletAddress = userDoc.data().walletAddress;
+    if (!walletAddress) return res.status(400).json({ error: 'User has no wallet address yet' });
+
+    const signer = getPlatformSigner();
+    const distributor = new ethers.Contract(
+      process.env.RENT_DISTRIBUTOR_ADDRESS,
+      DISTRIBUTOR_ABI,
+      signer
+    );
+
+    const tx      = await distributor.claimRentFor(walletAddress);
     const receipt = await tx.wait();
-    console.log('Rent distributed:', receipt.hash);
+    console.log('Rent claimed:', walletAddress, receipt.hash);
 
     return res.status(200).json({ txHash: receipt.hash });
   } catch (error) {
-    console.error('distributeRentOnChain error:', error);
+    console.error('claimRent error:', error);
     return res.status(500).json({ error: error.message });
   }
 });

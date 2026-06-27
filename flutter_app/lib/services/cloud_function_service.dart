@@ -73,16 +73,18 @@ class CloudFunctionService {
     return data['txHash'] as String;
   }
 
-  /// Trigger RentDistributor.distributeRent() from the platform wallet.
+  /// Claim all accumulated rent for the investor.
+  ///
+  /// [userId] — Firebase UID of the investor.
   ///
   /// Returns the transaction hash on success.
-  Future<String> distributeRentOnChain() async {
+  Future<String> claimRent({required String userId}) async {
     final response = await http.post(
-      Uri.parse('$_base/distributeRentOnChain'),
+      Uri.parse('$_base/claimRent'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({}),
+      body: jsonEncode({'userId': userId}),
     );
-    final data = _parseResponse(response, 'Distribute rent on-chain failed');
+    final data = _parseResponse(response, 'Claim rent failed');
     return data['txHash'] as String;
   }
 }
