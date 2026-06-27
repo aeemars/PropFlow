@@ -41,8 +41,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final user = await firestoreService.getUser(uid);
 
       if (user?.walletAddress != null && user!.walletAddress!.isNotEmpty) {
-        final claimable = await contractService.getClaimableRent(user.walletAddress!);
-        final expired = await contractService.getExpiredRent(user.walletAddress!);
+        final claimable = await contractService.getClaimableRent(
+          user.walletAddress!,
+        );
+        final expired = await contractService.getExpiredRent(
+          user.walletAddress!,
+        );
         if (mounted) {
           setState(() {
             _claimableRent = claimable;
@@ -70,7 +74,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Rent claimed successfully! TX: ${txHash.substring(0, 16)}...'),
+            content: Text(
+              'Rent claimed successfully! TX: ${txHash.substring(0, 16)}...',
+            ),
             backgroundColor: AppTheme.success,
           ),
         );
@@ -116,7 +122,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         stream: firestoreService.streamUser(uid),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: AppTheme.primary));
+            return const Center(
+              child: CircularProgressIndicator(color: AppTheme.primary),
+            );
           }
 
           final profile = snapshot.data;
@@ -144,13 +152,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 10,
+                  ),
                   child: Column(
                     children: [
                       // User Info Header
                       CircleAvatar(
                         radius: 40,
-                        backgroundColor: AppTheme.primary.withValues(alpha: 0.1),
+                        backgroundColor: AppTheme.primary.withValues(
+                          alpha: 0.1,
+                        ),
                         child: Text(
                           profile.displayName.isNotEmpty
                               ? profile.displayName[0].toUpperCase()
@@ -198,8 +211,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: OutlinedButton(
                           style: OutlinedButton.styleFrom(
                             foregroundColor: AppTheme.error,
-                            side: const BorderSide(color: AppTheme.error, width: 1.5),
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                            side: const BorderSide(
+                              color: AppTheme.error,
+                              width: 1.5,
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 16,
+                            ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -212,7 +231,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               const SizedBox(width: 8),
                               Text(
                                 'Log Out',
-                                style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+                                style: GoogleFonts.inter(
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ],
                           ),
@@ -262,7 +283,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 )
               else
                 IconButton(
-                  icon: const Icon(Icons.refresh, size: 20, color: AppTheme.primary),
+                  icon: const Icon(
+                    Icons.refresh,
+                    size: 20,
+                    color: AppTheme.primary,
+                  ),
                   onPressed: _loadRentDetails,
                   constraints: const BoxConstraints(),
                   padding: EdgeInsets.zero,
@@ -295,11 +320,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               if (expiredDouble > 0)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: AppTheme.error.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AppTheme.error.withValues(alpha: 0.3)),
+                    border: Border.all(
+                      color: AppTheme.error.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Text(
                     'Expired: ${expiredDouble.toStringAsFixed(2)}',
@@ -320,7 +350,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 backgroundColor: AppTheme.primary,
                 foregroundColor: const Color(0xFF0A0E17),
               ),
-              onPressed: (_isClaiming || _claimableRent == BigInt.zero) ? null : _claimRent,
+              onPressed: (_isClaiming || _claimableRent == BigInt.zero)
+                  ? null
+                  : _claimRent,
               child: _isClaiming
                   ? const SizedBox(
                       width: 20,
@@ -382,7 +414,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: kycColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
@@ -420,9 +455,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           const Divider(height: 24),
-          _buildRow('Wallet Provider', 'Circle (EOA Fallback)'),
-          const SizedBox(height: 12),
-          _buildRow('Wallet ID', profile.walletId ?? 'Not Generated'),
+          _buildRow('Wallet Provider', 'Circle'),
+          // const SizedBox(height: 12),
+          // _buildRow('Wallet ID', profile.walletId ?? 'Not Generated'),
           const SizedBox(height: 12),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -451,9 +486,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   if (profile.walletAddress != null)
                     IconButton(
-                      icon: const Icon(Icons.copy_rounded, size: 18, color: AppTheme.primary),
+                      icon: const Icon(
+                        Icons.copy_rounded,
+                        size: 18,
+                        color: AppTheme.primary,
+                      ),
                       onPressed: () {
-                        Clipboard.setData(ClipboardData(text: profile.walletAddress!));
+                        Clipboard.setData(
+                          ClipboardData(text: profile.walletAddress!),
+                        );
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text('Address copied to clipboard!'),
@@ -479,10 +520,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       children: [
         Text(
           label,
-          style: GoogleFonts.inter(
-            fontSize: 14,
-            color: AppTheme.textSecondary,
-          ),
+          style: GoogleFonts.inter(fontSize: 14, color: AppTheme.textSecondary),
         ),
         Text(
           value,
