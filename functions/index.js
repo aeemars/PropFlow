@@ -180,8 +180,16 @@ exports.onKycSubmitted = functions.firestore
     const before = change.before.data();
     const after = change.after.data();
 
-    // Only fire on the transition into 'pending'
-    if (before.kycStatus === "pending" || after.kycStatus !== "pending") {
+    // Check if the user is submitting KYC:
+    // Case 1: Transitioning from not-submitted (no fullName) to submitted (fullName present, status pending)
+    // Case 2: Transitioning from 'rejected' back to 'pending' after updating details
+    const wasPendingButNotSubmitted = before.kycStatus === "pending" && !before.fullName;
+    const isPendingAndSubmitted = after.kycStatus === "pending" && after.fullName;
+    const wasRejected = before.kycStatus === "rejected";
+    
+    const justSubmitted = (wasPendingButNotSubmitted && isPendingAndSubmitted) || (wasRejected && isPendingAndSubmitted);
+
+    if (!justSubmitted) {
       return null;
     }
 
