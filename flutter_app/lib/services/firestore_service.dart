@@ -94,12 +94,13 @@ class FirestoreService {
     return Property.fromFirestore(doc);
   }
 
-  /// Seed the demo property if it doesn't exist.
-  Future<void> seedDemoProperty() async {
-    final demo = Property.demoProperty();
-    final doc = await _db.collection('properties').doc(demo.id).get();
-    if (!doc.exists) {
-      await _db.collection('properties').doc(demo.id).set(demo.toFirestore());
+  /// Seed the demo properties if they don't exist.
+  Future<void> seedDemoProperties() async {
+    for (final prop in Property.demoProperties()) {
+      final doc = await _db.collection('properties').doc(prop.id).get();
+      if (!doc.exists) {
+        await _db.collection('properties').doc(prop.id).set(prop.toFirestore());
+      }
     }
   }
 

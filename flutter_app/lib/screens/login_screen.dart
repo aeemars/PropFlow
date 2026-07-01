@@ -92,8 +92,8 @@ class _LoginScreenState extends State<LoginScreen>
           await _createWalletBlocking(user.uid);
         }
 
-        // Seed demo property
-        await firestoreService.seedDemoProperty();
+        // Seed demo properties
+        await firestoreService.seedDemoProperties();
       }
     } catch (e) {
       if (mounted) {
