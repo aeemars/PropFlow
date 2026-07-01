@@ -102,10 +102,10 @@ class PropertyListingScreen extends StatelessWidget {
                 );
               }
 
-              // Use demo property if Firestore is empty
+              // Use demo properties if Firestore is empty
               final properties = snapshot.data?.isNotEmpty == true
                   ? snapshot.data!
-                  : [Property.demoProperty()];
+                  : Property.demoProperties();
 
               return SliverPadding(
                 padding: const EdgeInsets.all(20),
@@ -217,84 +217,121 @@ class _PropertyCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Image area
-          Container(
-            height: 180,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(16)),
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF1A3A5C),
-                  Color(0xFF0D2240),
-                  Color(0xFF162D4A),
-                ],
-              ),
-            ),
-            child: Stack(
-              children: [
-                // Building illustration (placeholder)
-                Center(
-                  child: Icon(
-                    Icons.apartment_rounded,
-                    size: 64,
-                    color: AppTheme.primary.withValues(alpha: 0.3),
-                  ),
-                ),
-                // Location badge
-                Positioned(
-                  top: 12,
-                  left: 12,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.location_on_outlined,
-                            color: Colors.white, size: 14),
-                        const SizedBox(width: 4),
-                        Text(
-                          property.location,
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: Colors.white,
-                            fontWeight: FontWeight.w500,
+          ClipRRect(
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(16)),
+            child: SizedBox(
+              height: 180,
+              width: double.infinity,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Property photo, falls back to gradient + icon if the
+                  // URL is missing or fails to load (e.g. offline demo).
+                  if (property.coverImageUrl != null &&
+                      property.coverImageUrl!.isNotEmpty)
+                    Image.network(
+                      property.coverImageUrl!,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, progress) {
+                        if (progress == null) return child;
+                        return Container(
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Color(0xFF1A3A5C),
+                                Color(0xFF0D2240),
+                                Color(0xFF162D4A),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                // RERA badge
-                Positioned(
-                  top: 12,
-                  right: 12,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 4),
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              color: AppTheme.primary,
+                              strokeWidth: 2,
+                            ),
+                          ),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) =>
+                          _PropertyImageFallback(),
+                    )
+                  else
+                    _PropertyImageFallback(),
+
+                  // Dark gradient overlay so badges stay legible over
+                  // any photo
+                  Container(
                     decoration: BoxDecoration(
-                      color: AppTheme.secondary.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                          color: AppTheme.secondary.withValues(alpha: 0.4)),
-                    ),
-                    child: Text(
-                      property.reraNumber,
-                      style: GoogleFonts.inter(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.secondary,
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.35),
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.15),
+                        ],
+                        stops: const [0.0, 0.5, 1.0],
                       ),
                     ),
                   ),
-                ),
-              ],
+
+                  // Location badge
+                  Positioned(
+                    top: 12,
+                    left: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.location_on_outlined,
+                              color: Colors.white, size: 14),
+                          const SizedBox(width: 4),
+                          Text(
+                            property.location,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // RERA badge
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppTheme.secondary.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                            color:
+                                AppTheme.secondary.withValues(alpha: 0.4)),
+                      ),
+                      child: Text(
+                        property.reraNumber,
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.secondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
 
@@ -445,6 +482,34 @@ class _PropertyCard extends StatelessWidget {
     if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
     if (n >= 1000) return '${(n / 1000).toStringAsFixed(0)}K';
     return n.toStringAsFixed(n == n.roundToDouble() ? 0 : 2);
+  }
+}
+
+/// Gradient + icon placeholder shown when a property has no cover image
+/// or the image URL fails to load.
+class _PropertyImageFallback extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF1A3A5C),
+            Color(0xFF0D2240),
+            Color(0xFF162D4A),
+          ],
+        ),
+      ),
+      child: Center(
+        child: Icon(
+          Icons.apartment_rounded,
+          size: 64,
+          color: AppTheme.primary.withValues(alpha: 0.3),
+        ),
+      ),
+    );
   }
 }
 
